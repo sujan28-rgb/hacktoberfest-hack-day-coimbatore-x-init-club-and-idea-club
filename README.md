@@ -8,10 +8,10 @@
 
 | Member | Contribution   |
 | ------ | -------------- |
-| Sujan  | Evidence Foundation (Intake, Hashing, Normalization, SQLite) |
-| Pramit | Correlation and Claims (Process Identity, Typed Edges, Claim Validation) |
-| Sujai  | AI, Validation, Evaluation (Evidence Packets, Ollama Integration, Testing) |
-| Jana   | API, UI, Security (FastAPI, React Viewer, Evidence Drill-down) |
+| Sujan  | Evidence Intake, Validation, Normalization, and SQLite Storage |
+| Pramit | Entity/Process Resolution and Correlation |
+| Jana   | Scenarios and Typed Claims |
+| Sujai  | Evidence Packet, Local AI, FastAPI, React, and Security |
 
 ## Problem Statement
 
@@ -87,9 +87,9 @@ The core deterministic pipeline was implemented alongside the UI and AI integrat
 ### Team Contributions
 
 - **Sujan:** Built the intake pipeline, manifest handling, Sysmon normalization, SQLite repository, and deterministic event IDs.
-- **Pramit:** Implemented entity resolution `(host, ProcessGuid)`, the three MVP scenarios, claim compilation, support sets, and contradiction logic.
-- **Sujai:** Developed the evidence packet builder, Ollama integration, structured model output, validation, and evaluation harness.
-- **Jana:** Built the FastAPI endpoints, case isolation, and the React/TypeScript case viewer featuring timelines and evidence drill-down.
+- **Pramit:** Implemented entity resolution and correlation.
+- **Jana:** Implemented the three MVP scenarios, typed claim compilation, support sets, and contradiction logic.
+- **Sujai:** Built the FastAPI endpoints, case isolation, React/TypeScript case viewer, and API security tests. Evidence Packet and Local Ollama integration remain assigned but are not present in the integrated branch.
 
 ## Working Application
 
@@ -131,10 +131,13 @@ git clone https://github.com/sujan28-rgb/hacktoberfest-hack-day-coimbatore-x-ini
 cd hacktoberfest-hack-day-coimbatore-x-init-club-and-idea-club
 
 # Setup Python Backend
-# [installation-command] e.g., pip install -e .
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e '.[test]'
 
 # Setup Frontend
-# cd web && npm install
+cd web
+npm ci
 ```
 
 ### Environment Variables
@@ -147,10 +150,11 @@ cd hacktoberfest-hack-day-coimbatore-x-init-club-and-idea-club
 
 ```bash
 # Start Backend
-# uvicorn sentinel_evidence.api.app:app --reload
+uvicorn sentinel_evidence.api.app:app --reload
 
-# Start Frontend
-# cd web && npm start
+# Start Frontend (in a second terminal)
+cd web
+npm run dev
 ```
 
 ### Usage
