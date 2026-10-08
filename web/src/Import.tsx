@@ -25,6 +25,7 @@ export function Import({ caseId, onImportComplete }: { caseId: string, onImportC
     <div style={{ border: '1px solid #aaa', padding: '15px', marginBottom: '20px', borderRadius: '5px' }}>
       <h3>Import Evidence (JSONL)</h3>
       <p style={{ color: '#555' }}>Select a JSONL file to import. We do not scan your filesystem.</p>
+      <p>Each case holds one source. Importing again replaces this case’s current evidence and analysis.</p>
       <input
         type="file"
         accept=".jsonl"

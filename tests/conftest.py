@@ -135,7 +135,7 @@ def network_event(mock_source):
         parent_image=None,
         user="CORP\\jdoe",
         source=mock_source,
-        fields={"dest_ip": "10.0.0.99", "dest_port": 443, "protocol": "tcp"},
+        fields={"dest_ip": "10.0.0.99", "dest_port": 443, "protocol": "tcp", "Initiated": True},
     )
 
 

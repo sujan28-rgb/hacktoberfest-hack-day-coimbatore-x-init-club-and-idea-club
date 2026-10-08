@@ -40,7 +40,7 @@ from sentinel_evidence.contracts import (
 # Policy loading
 # ---------------------------------------------------------------------------
 
-_DEFAULT_POLICY_PATH = Path(__file__).resolve().parents[3] / "policies" / "scenarios.yaml"
+_DEFAULT_POLICY_PATH = Path(__file__).with_name("scenarios.yaml")
 
 
 def load_scenario_policies(path: Optional[Path] = None) -> list[dict[str, Any]]:
@@ -159,7 +159,7 @@ def _match_suspicious_parent_child(
         constraints_satisfied = []
         constraints_violated = []
 
-        if _has_guid_identity(parent_event) and child_event.parent_process_guid == parent_event.process_guid:
+        if parent_event.host and parent_event.host == child_event.host and _has_guid_identity(parent_event) and child_event.parent_process_guid == parent_event.process_guid:
             constraints_satisfied.append("parent_child edge links parent and child via ProcessGuid")
         else:
             constraints_violated.append("parent_child edge must link parent and child via ProcessGuid")
@@ -231,12 +231,16 @@ def _match_flagged_process_network(
         constraints_violated = []
 
         # Temporal ordering
-        if network_event.timestamp >= process_event.timestamp:
+        if network_event.timestamp is not None and process_event.timestamp is not None and (network_event.timestamp.tzinfo is None) == (process_event.timestamp.tzinfo is None) and network_event.timestamp >= process_event.timestamp:
             constraints_satisfied.append("connection event follows process creation temporally")
         else:
             constraints_violated.append("connection event must follow process creation temporally")
 
         # Identity: ProcessGuid required
+        if str(network_event.fields.get("Initiated", "")).lower() != "true":
+            constraints_violated.append("outbound direction must be explicitly reported")
+        if not network_event.fields.get("dest_ip"):
+            constraints_violated.append("destination address must be present")
         if _same_guid_identity(process_event, network_event):
             constraints_satisfied.append("process identity resolved via ProcessGuid")
         else:
@@ -302,7 +306,7 @@ def _match_flagged_process_file_create(
         constraints_violated = []
 
         # Temporal ordering
-        if file_event.timestamp >= process_event.timestamp:
+        if file_event.timestamp is not None and process_event.timestamp is not None and (file_event.timestamp.tzinfo is None) == (process_event.timestamp.tzinfo is None) and file_event.timestamp >= process_event.timestamp:
             constraints_satisfied.append("file_create event follows process creation temporally")
         else:
             constraints_violated.append("file_create event must follow process creation temporally")
@@ -312,6 +316,9 @@ def _match_flagged_process_file_create(
             constraints_satisfied.append("process identity resolved via ProcessGuid")
         else:
             constraints_violated.append("process identity must be resolved via ProcessGuid, not PID alone")
+
+        if not file_event.fields.get("target_filename"):
+            constraints_violated.append("target filename must be present")
 
         # Finding must flag the process
         process_findings = findings_by_event.get(process_event.event_id, [])

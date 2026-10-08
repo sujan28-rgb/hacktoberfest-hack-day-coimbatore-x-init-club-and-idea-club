@@ -6,6 +6,7 @@ export function AIExplanation({ caseId, claimId }: { caseId: string, claimId: st
   const [disclaimer, setDisclaimer] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [status, setStatus] = useState('');
 
   useEffect(() => {
     setLoading(true);
@@ -14,6 +15,7 @@ export function AIExplanation({ caseId, claimId }: { caseId: string, claimId: st
       .then(res => {
         setExplanation(res.explanation);
         setDisclaimer(res.disclaimer);
+        setStatus(res.status);
       })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
@@ -22,6 +24,7 @@ export function AIExplanation({ caseId, claimId }: { caseId: string, claimId: st
   return (
     <div style={{ border: '1px solid #ccc', padding: '10px', marginTop: '10px', backgroundColor: '#f9f9ff' }}>
       <h4>AI Explanation</h4>
+      <p>{status}</p>
       {loading ? <p>Loading explanation...</p> : null}
       {error ? <p style={{ color: 'red' }}>{error}</p> : null}
       {explanation && !loading && (

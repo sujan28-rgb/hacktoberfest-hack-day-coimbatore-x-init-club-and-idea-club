@@ -2,9 +2,11 @@ import { useState } from 'react';
 import type { Claim } from './api';
 import { EvidenceDetail } from './EvidenceDetail';
 import { AIExplanation } from './AIExplanation';
+import { getPacket } from './api';
 
 export function ClaimPanel({ caseId, claim }: { caseId: string, claim: Claim }) {
   const [expanded, setExpanded] = useState(false);
+  const [packet, setPacket] = useState("");
 
   const getStatusColor = (status: string) => {
     switch(status) {
@@ -68,6 +70,8 @@ export function ClaimPanel({ caseId, claim }: { caseId: string, claim: Claim }) 
           </div>
 
           <AIExplanation caseId={caseId} claimId={claim.claim_id} />
+          <button onClick={() => getPacket(caseId, claim.claim_id).then(p => setPacket(JSON.stringify(p, null, 2))).catch(err => setPacket(err.message))}>Inspect evidence packet</button>
+          {packet && <pre style={{whiteSpace: "pre-wrap", overflowWrap: "anywhere"}}>{packet}</pre>}
         </div>
       )}
     </div>

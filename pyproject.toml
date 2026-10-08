@@ -8,22 +8,26 @@ version = "0.1.0"
 description = "Evidence-first security investigation system for Windows telemetry"
 requires-python = ">=3.10"
 dependencies = [
-    "fastapi>=0.110.0",
-    "pydantic>=2.6.0",
-    "python-multipart>=0.0.9",
     "pyyaml>=6.0",
-    "uvicorn[standard]>=0.27.0",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "python-multipart>=0.0.18",
 ]
 
 [project.optional-dependencies]
 test = [
-    "httpx>=0.27.0",
     "pytest>=7.0",
-    "pytest-asyncio>=0.23.0",
+    "httpx>=0.27",
 ]
+
+[project.scripts]
+sentinel-evidence = "sentinel_evidence.cli:main"
+
+[tool.setuptools.package-data]
+sentinel_evidence = ["db/schema.sql", "correlate/*.yaml"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-asyncio_mode = "auto"

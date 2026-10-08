@@ -1,0 +1,3 @@
+{"EventID":1,"Computer":"LAB","UtcTime":"2026-10-08T10:00:00Z","ProcessGuid":"first","ProcessId":200,"Image":"powershell.exe","CommandLine":"powershell.exe -enc ZWNobyBoaQ=="}
+{"EventID":1,"Computer":"LAB","UtcTime":"2026-10-08T10:00:01Z","ProcessGuid":"second","ProcessId":200,"Image":"powershell.exe"}
+{"EventID":3,"Computer":"LAB","UtcTime":"2026-10-08T10:00:02Z","ProcessId":200,"DestinationIp":"192.0.2.10","Initiated":true}

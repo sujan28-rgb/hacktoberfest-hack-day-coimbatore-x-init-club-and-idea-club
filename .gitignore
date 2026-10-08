@@ -7,8 +7,13 @@ __pycache__/
 .pytest_cache/
 venv/
 .venv/
-web/node_modules/
+.env
+node_modules/
 web/dist/
 web/.eslintcache
 web/dist-ssr/
 .DS_Store
+.sentinel/
+*.db
+*.db-shm
+*.db-wal

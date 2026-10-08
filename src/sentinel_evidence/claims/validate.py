@@ -167,7 +167,7 @@ def check_evidence_removal(
     valid_support_sets = []
     for ss in claim.support_sets:
         remaining_ids = [eid for eid in ss.evidence_ids if eid in available_evidence_ids]
-        if remaining_ids:
+        if remaining_ids and len(remaining_ids) == len(ss.evidence_ids):
             valid_support_sets.append(SupportSet(
                 evidence_ids=remaining_ids,
                 relevant_fields=ss.relevant_fields,
