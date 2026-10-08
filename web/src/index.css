@@ -66,6 +66,29 @@ body {
   margin: 0;
 }
 
+.monitor-panel, .notification-panel, .snapshot-banner {
+  margin: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.notification-item {
+  border-top: 1px solid var(--border);
+  padding: 1rem 0;
+}
+.monitor-panel button, .snapshot-banner button {
+  margin: 0.5rem 0.5rem 0.5rem 0;
+}
+.monitor-panel p, .notification-item p {
+  margin: 0.4rem 0;
+}
+.case-view h1 {
+  font-size: 2rem;
+  line-height: 1.2;
+}
+
 h1,
 h2 {
   font-family: var(--heading);

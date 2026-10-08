@@ -2,15 +2,15 @@ import { useEffect, useState } from 'react';
 import { getEvent, downloadSource } from './api';
 import type { Event } from './api';
 
-export function EvidenceDetail({ caseId, eventId, highlightedFields }: { caseId: string, eventId: string, highlightedFields: string[] }) {
+export function EvidenceDetail({ caseId, eventId, highlightedFields, revision }: { caseId: string, eventId: string, highlightedFields: string[], revision?: string }) {
   const [event, setEvent] = useState<Event | null>(null);
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
-    getEvent(caseId, eventId)
+    getEvent(caseId, eventId, revision)
       .then(setEvent)
       .catch(err => setError(err.message));
-  }, [caseId, eventId]);
+  }, [caseId, eventId, revision]);
 
   if (error) return <p style={{ color: 'red' }}>Error loading evidence: {error}</p>;
   if (!event) return <p>Loading evidence...</p>;
@@ -21,8 +21,8 @@ export function EvidenceDetail({ caseId, eventId, highlightedFields }: { caseId:
       <p><strong>Timestamp:</strong> {event.original_timestamp_text}</p>
       <p><strong>Source SHA-256:</strong> {event.source_id}</p>
       <button onClick={() => downloadSource(caseId, event.source_id).catch(err => setError(err.message))}>Download original source</button>
-      <div style={{ backgroundColor: '#f0f0f0', padding: '5px' }}>
-        <pre style={{ margin: 0 }}>
+      <div style={{ backgroundColor: '#f0f0f0', color: '#16171d', padding: '5px' }}>
+        <pre style={{ margin: 0, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
           {Object.entries(event.raw_fields).map(([key, value]) => {
             const isHighlighted = highlightedFields.includes(key);
             return (

@@ -1,8 +1,6 @@
 """Case-scoped API over the shared deterministic engine."""
-import os
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Header, Response
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Header, Response, Request
 from fastapi.concurrency import run_in_threadpool
-from sentinel_evidence.db.cases import CaseStore
 from sentinel_evidence.pipeline import analyze, MAX_BYTES
 from sentinel_evidence.explain.packet import build_packet
 from sentinel_evidence.explain.ollama import explain
@@ -10,8 +8,8 @@ from sentinel_evidence.explain.ollama import explain
 router = APIRouter()
 
 
-def store():
-    return CaseStore(os.getenv("SENTINEL_DB", ".sentinel/cases.db"))
+def store(request: Request):
+    return request.app.state.case_store
 
 
 def current_case(case_id: str, authorization: str = Header(default=""), db=Depends(store)):
@@ -27,7 +25,7 @@ def create_case(db=Depends(store)):
 
 
 @router.post("/cases/{case_id}/import")
-async def import_evidence(case_id: str = Depends(current_case), file: UploadFile = File(...), db=Depends(store)):
+async def import_evidence(request: Request, case_id: str = Depends(current_case), file: UploadFile = File(...), db=Depends(store)):
     filename = file.filename or ""
     if not filename.lower().endswith(".jsonl") or any(c in filename for c in ("/", "\\", "\x00")) or filename in {".", ".."} or len(filename) > 200:
         raise HTTPException(400, "Provide a safe JSONL filename")
@@ -39,7 +37,13 @@ async def import_evidence(case_id: str = Depends(current_case), file: UploadFile
         report = await run_in_threadpool(analyze, contents, filename)
     except ValueError as error:
         raise HTTPException(400, str(error)) from error
-    await run_in_threadpool(db.save, case_id, report, contents)
+    def save():
+        manager = request.app.state.monitor
+        with manager.lock:
+            if (db.monitor(case_id) or {}).get("enabled"):
+                raise HTTPException(409, "Pause monitoring before importing evidence manually")
+            db.save(case_id, report, contents)
+    await run_in_threadpool(save)
     return {"status": "success", "filename": filename, "size": len(contents),
             "hash_status": "sha256_verified", "run": report["run"]}
 
@@ -51,6 +55,13 @@ def event_view(event):
             "normalized_timestamp": event["timestamp"] or "",
             "provider": str(raw.get("Provider", "")), "channel": str(raw.get("Channel", "")),
             "event_record_id": str(raw.get("EventRecordID", ""))}
+
+
+def read_report(db, case_id, revision):
+    try:
+        return db.report(case_id, revision)
+    except KeyError:
+        raise HTTPException(404, "Investigation snapshot not found")
 
 
 def claim_view(claim, report):
@@ -70,8 +81,8 @@ def claim_view(claim, report):
 
 
 @router.get("/cases/{case_id}/sources")
-def sources(case_id: str = Depends(current_case), db=Depends(store)):
-    return db.report(case_id)["sources"]
+def sources(case_id: str = Depends(current_case), revision: str | None = None, db=Depends(store)):
+    return read_report(db, case_id, revision)["sources"]
 
 
 @router.get("/cases/{case_id}/sources/{source_id}/original")
@@ -85,22 +96,22 @@ def original(source_id: str, case_id: str = Depends(current_case), db=Depends(st
 
 
 @router.get("/cases/{case_id}/report")
-def report(case_id: str = Depends(current_case), db=Depends(store)):
-    return db.report(case_id)
+def report(case_id: str = Depends(current_case), revision: str | None = None, db=Depends(store)):
+    return read_report(db, case_id, revision)
 
 
 @router.get("/cases/{case_id}/events/{event_id}")
-def event(event_id: str, case_id: str = Depends(current_case), db=Depends(store)):
-    record = next((e for e in db.report(case_id)["events"] if e["event_id"] == event_id), None)
+def event(event_id: str, case_id: str = Depends(current_case), revision: str | None = None, db=Depends(store)):
+    record = next((e for e in read_report(db, case_id, revision)["events"] if e["event_id"] == event_id), None)
     if record is None:
         raise HTTPException(404, "Event not found")
     return event_view(record)
 
 
 @router.get("/cases/{case_id}/claims/{claim_id}/packet")
-def packet(claim_id: str, case_id: str = Depends(current_case), db=Depends(store)):
+def packet(claim_id: str, case_id: str = Depends(current_case), revision: str | None = None, db=Depends(store)):
     try:
-        return build_packet(db.report(case_id), claim_id)
+        return build_packet(read_report(db, case_id, revision), claim_id)
     except KeyError:
         raise HTTPException(404, "Claim not found")
     except ValueError as error:
@@ -108,19 +119,29 @@ def packet(claim_id: str, case_id: str = Depends(current_case), db=Depends(store
 
 
 @router.get("/cases/{case_id}/claims/{claim_id}/explain")
-def explanation(claim_id: str, case_id: str = Depends(current_case), db=Depends(store)):
+def explanation(claim_id: str, case_id: str = Depends(current_case), revision: str | None = None, db=Depends(store)):
     try:
-        return explain(db.report(case_id), claim_id)
+        return explain(read_report(db, case_id, revision), claim_id)
     except KeyError:
         raise HTTPException(404, "Claim not found")
 
 
+@router.get("/cases/{case_id}/claims/{claim_id}")
+def claim(claim_id: str, case_id: str = Depends(current_case), revision: str | None = None, db=Depends(store)):
+    report = read_report(db, case_id, revision)
+    record = next((c for c in report["claims"] if c["claim_id"] == claim_id), None)
+    if record is None:
+        raise HTTPException(404, "Claim not found")
+    return claim_view(record, report)
+
+
 @router.get("/cases/{case_id}/{collection}")
 def collection(collection: str, case_id: str = Depends(current_case),
-               page: int = Query(1, ge=1), size: int = Query(50, ge=1, le=100), db=Depends(store)):
+               page: int = Query(1, ge=1), size: int = Query(50, ge=1, le=100),
+               revision: str | None = None, db=Depends(store)):
     if collection not in {"events", "claims", "findings", "edges"}:
         raise HTTPException(404, "Collection not found")
-    report = db.report(case_id)
+    report = read_report(db, case_id, revision)
     records = report[collection]
     selected = records[(page - 1) * size:page * size]
     if collection == "events":

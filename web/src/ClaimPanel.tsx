@@ -4,8 +4,8 @@ import { EvidenceDetail } from './EvidenceDetail';
 import { AIExplanation } from './AIExplanation';
 import { getPacket } from './api';
 
-export function ClaimPanel({ caseId, claim }: { caseId: string, claim: Claim }) {
-  const [expanded, setExpanded] = useState(false);
+export function ClaimPanel({ caseId, claim, revision, initiallyExpanded = false }: { caseId: string, claim: Claim, revision?: string, initiallyExpanded?: boolean }) {
+  const [expanded, setExpanded] = useState(initiallyExpanded);
   const [packet, setPacket] = useState("");
 
   const getStatusColor = (status: string) => {
@@ -21,7 +21,7 @@ export function ClaimPanel({ caseId, claim }: { caseId: string, claim: Claim }) 
   return (
     <div style={{ border: '1px solid #ddd', margin: '10px 0', borderRadius: '4px' }}>
       <div
-        style={{ padding: '10px', backgroundColor: '#f8f9fa', cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}
+        style={{ padding: '10px', backgroundColor: 'var(--code-bg)', color: 'var(--text-h)', cursor: 'pointer', display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'space-between' }}
         onClick={() => setExpanded(!expanded)}
       >
         <strong>{claim.predicate_type}</strong>
@@ -64,13 +64,14 @@ export function ClaimPanel({ caseId, claim }: { caseId: string, claim: Claim }) 
                   caseId={caseId}
                   eventId={support.event_id}
                   highlightedFields={support.fields}
+                  revision={revision}
                 />
               ))
             )}
           </div>
 
-          <AIExplanation caseId={caseId} claimId={claim.claim_id} />
-          <button onClick={() => getPacket(caseId, claim.claim_id).then(p => setPacket(JSON.stringify(p, null, 2))).catch(err => setPacket(err.message))}>Inspect evidence packet</button>
+          <AIExplanation caseId={caseId} claimId={claim.claim_id} revision={revision} />
+          <button onClick={() => getPacket(caseId, claim.claim_id, revision).then(p => setPacket(JSON.stringify(p, null, 2))).catch(err => setPacket(err.message))}>Inspect evidence packet</button>
           {packet && <pre style={{whiteSpace: "pre-wrap", overflowWrap: "anywhere"}}>{packet}</pre>}
         </div>
       )}

@@ -1,6 +1,7 @@
 """One deterministic engine used by HTTP, CLI, and evaluation."""
 import hashlib
 import json
+import math
 from datetime import datetime, timezone
 from pathlib import Path
 from sentinel_evidence.contracts import Run, ClaimStatus, SupportSet
@@ -21,8 +22,8 @@ def reject_constant(value):
     raise ValueError("Non-finite JSON number")
 
 
-def analyze(contents: bytes, filename="evidence.jsonl"):
-    started_at = datetime.now(timezone.utc)
+def prepare_source(contents: bytes, filename="evidence.jsonl", collection_metadata=None):
+    """Shared intake/normalization boundary for uploads and local collectors."""
     if not contents or len(contents) > MAX_BYTES:
         raise ValueError("Evidence must contain between 1 byte and 10 MiB")
     digest = hashlib.sha256(contents).hexdigest()
@@ -38,12 +39,43 @@ def analyze(contents: bytes, filename="evidence.jsonl"):
             raise ValueError(f"Invalid JSON at line {number}") from error
         if not isinstance(raw, dict):
             raise ValueError(f"Expected an object at line {number}")
+        pending = [(raw, 0)]
+        while pending:
+            value, depth = pending.pop()
+            if depth > 64:
+                raise ValueError(f"Record nesting exceeds limit at line {number}")
+            if isinstance(value, float) and not math.isfinite(value):
+                raise ValueError(f"Non-finite number at line {number}")
+            if isinstance(value, dict):
+                pending.extend((child, depth + 1) for child in value.values())
+            elif isinstance(value, list):
+                pending.extend((child, depth + 1) for child in value)
         for key in ("Computer", "host", "ProcessGuid", "ParentProcessGuid", "Image", "CommandLine", "UtcTime", "TimeCreated"):
             if key in raw and raw[key] is not None and not isinstance(raw[key], str):
                 raise ValueError(f"Invalid {key} at line {number}")
         events.append(normalize_sysmon_event(digest, filename, number, raw, line))
     if not events:
         raise ValueError("No evidence records")
+    source = {
+        "source_id": digest, "content_hash": digest, "declared_host": "",
+        "collection_metadata": collection_metadata or {},
+        "export_metadata": {"profile": "flat-sysmon-jsonl-v1"},
+        "byte_size": len(contents), "exporter_version": "not supplied",
+        "original_source_mapping": filename,
+    }
+    return events, source
+
+
+def investigate(prepared_sources):
+    """Correlate all selected sources together without duplicating processing logic."""
+    started_at = datetime.now(timezone.utc)
+    unique = {}
+    for events, source in prepared_sources:
+        unique.setdefault(source["source_id"], (events, source))
+    events = [event for batch, _ in unique.values() for event in batch]
+    sources = [source for _, source in unique.values()]
+    if len(events) > MAX_EVENTS or sum(s["byte_size"] for s in sources) > MAX_BYTES:
+        raise ValueError("Combined evidence exceeds investigation limits")
     findings = detect(events)
     edges, identities = correlate(events)
     claims = [c for c, _ in validate_claims(compile_claims(run_scenarios(events, edges, findings)))]
@@ -76,17 +108,13 @@ def analyze(contents: bytes, filename="evidence.jsonl"):
             claim.unmet_prerequisites.append("Conflicting original record values require review")
     report = plain({"events": events, "findings": findings, "edges": edges, "claims": claims,
                     "identities": identities})
+    report["sources"] = sources
+    # Include source selection even when no events remain after an evidence change.
     output_hash = hashlib.sha256(encode(report).encode()).hexdigest()
-    report["sources"] = [{
-        "source_id": digest, "content_hash": digest, "declared_host": "",
-        "collection_metadata": {}, "export_metadata": {"profile": "flat-sysmon-jsonl-v1"},
-        "byte_size": len(contents), "exporter_version": "not supplied",
-        "original_source_mapping": filename,
-    }]
     policy = Path(__file__).parent / "correlate" / "scenarios.yaml"
     run = Run(
         run_id=output_hash[:24], started_at=started_at, completed_at=datetime.now(timezone.utc),
-        source_hashes=[digest], parser_version="sysmon-flat-v1",
+        source_hashes=sorted(unique), parser_version="sysmon-flat-v1",
         detector_version=DETECTOR_VERSION, rule_version=DETECTOR_VERSION,
         policy_version=hashlib.sha256(policy.read_bytes()).hexdigest(),
         parameters={"correlation_window_seconds": 300},
@@ -97,3 +125,7 @@ def analyze(contents: bytes, filename="evidence.jsonl"):
     run.timestamps = {"started_at": run.started_at.isoformat(), "completed_at": run.completed_at.isoformat()}
     report["run"] = {k: v for k, v in plain(run).items() if k not in {"events", "findings", "edges", "claims"}}
     return report
+
+
+def analyze(contents: bytes, filename="evidence.jsonl"):
+    return investigate([prepare_source(contents, filename)])

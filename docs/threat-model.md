@@ -22,3 +22,11 @@ returns deterministic results. No arbitrary AI prose is accepted as verified evi
 Out of scope: a compromised local OS/browser, malicious administrator, multi-user
 deployment, encrypted database storage, and denial of service from an authorized local
 user repeatedly creating cases. Do not expose the development servers publicly.
+
+Background monitoring is disabled until a workspace is explicitly configured and a
+case owner starts it. The worker reads direct ordinary JSONL files only, using pinned
+directory descriptors, no-follow opens and stable-read checks. Source metadata records
+the local account/device and original file owner. No OS collector, recursive traversal
+or arbitrary path API is provided. Notifications and retained report revisions are
+case-authorized; missing/unreadable files do not cause false evidence-withdrawal alerts.
+See monitoring.md for limits, failure semantics and retained-history storage.

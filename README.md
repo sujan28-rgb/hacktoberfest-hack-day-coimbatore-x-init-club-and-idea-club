@@ -1,8 +1,9 @@
 # Sentinel Evidence
 
 A local-first Windows telemetry investigation tool: **evidence first, claims second,
-explanation last**. Import a selected JSONL file, inspect deterministic relationships
-and typed claims, and trace each claim back to its original bytes.
+explanation last**. Monitor an explicitly authorized evidence workspace, receive
+notifications about meaningful deterministic results, and trace each claim back to
+its original bytes. Manual JSONL import remains available for testing and fallback.
 
 ## Team and problem
 
@@ -27,6 +28,8 @@ This project was selected to make these boundaries explicit and inspectable.
 - SQLite case storage, random bearer-token isolation, paginated FastAPI endpoints.
 - React import, timeline, claims, packet inspection and original-source download.
 - Shared headless CLI and fixture replay/evaluation.
+- Background workspace monitoring with pause/retry, real status counters and persistent state.
+- Evidence-backed in-app notifications, deduplication and historical investigation drill-down.
 
 The differentiator is traceable support and conservative uncertainty, rather than an AI
 narrative. Claims remain authoritative when the model is unavailable.
@@ -49,7 +52,8 @@ submission work not yet completed. This README describes the code actually prese
 ## Setup
 
 Prerequisites: Python 3.10+, Node.js 22.14+ (or a compatible newer release), npm.
-Ollama is optional. Run all commands from the repository root unless noted.
+Ollama is optional. The supplied folder-monitoring adapter requires macOS/Linux.
+Run all commands from the repository root unless noted.
 
 ~~~sh
 python3 -m venv .venv
@@ -66,11 +70,17 @@ npm ci
 npm run dev -- --host 127.0.0.1
 ~~~
 
-Open http://127.0.0.1:5173. Click **New investigation**, select
-fixtures/tiny-supported.jsonl, and click **Import**. Expand a claim to inspect
-supporting records, explanation status and its evidence packet. The source-download
-button returns the exact original file. Each case holds one source; importing again
-replaces that case's current analysis. Create another case to retain separate evidence.
+Open http://127.0.0.1:5173 and click **New investigation**. With an evidence workspace
+configured below, click **Start monitoring**. New or changed JSONL snapshots in that
+folder are analyzed automatically; no manual upload is needed. The notification bell
+opens the relevant saved claim and evidence. The source-download button returns the
+exact original file.
+
+For development/manual fallback, expand **Manual JSONL import / fallback**, select
+fixtures/tiny-supported.jsonl, and click **Import**. Pause monitoring before importing.
+Manual import replaces the active source selection; previous evidence snapshots are
+retained for notification links. Monitoring correlates all valid selected workspace
+files together. Create separate investigations to keep separate selections.
 
 Case access tokens remain in browser sessionStorage. Keep the browser session open.
 API clients receive case_id and token from POST /api/v1/cases; subsequent
@@ -103,6 +113,23 @@ the app does not automatically load .env files.
 - SENTINEL_DB: defaults to .sentinel/cases.db.
 - OLLAMA_URL: defaults to http://127.0.0.1:11434; loopback HTTP only.
 - OLLAMA_MODEL: empty/absent disables AI. Set to a model already installed locally.
+- SENTINEL_EVIDENCE_WORKSPACE: no default; absolute path to an explicitly authorized,
+  dedicated evidence folder. Only direct ordinary JSONL files are read.
+- SENTINEL_MONITOR_INTERVAL: scan interval in seconds, default 5, bounded to 1–300.
+
+Before starting the backend, authorize your evidence workspace:
+
+~~~sh
+export SENTINEL_EVIDENCE_WORKSPACE=/absolute/path/to/your/evidence-workspace
+export SENTINEL_MONITOR_INTERVAL=5
+~~~
+
+Use one backend worker. Monitoring runs while the backend is running and resumes
+enabled subscriptions after restart. A collector/exporter must publish complete JSONL
+snapshots into this folder; Sentinel does not yet include an OS-level event collector.
+No whole-computer or recursive directory scan occurs. Missing/malformed sources keep
+their last valid evidence and display errors; unchanged snapshots do not repeat
+processing or notifications. See [monitoring behavior and the collector boundary](docs/monitoring.md).
 
 ~~~sh
 export OLLAMA_MODEL='your-installed-model'

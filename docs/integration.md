@@ -33,7 +33,8 @@ oversized packets fall back rather than dropping counterevidence.
 
 ## Scope and limitations
 
-- One selected source per case; importing again replaces that case's evidence.
+- Manual import selects one source; workspace monitoring correlates multiple files.
+  Historical snapshots retain evidence cited by notifications.
 - Flat Sysmon JSONL only. No binary EVTX parser, Hayabusa import or cloud AI.
 - The detector is one transparent indicator, not a comprehensive threat ruleset.
 - Contradiction detection handles conflicting values for the same host/channel/record
