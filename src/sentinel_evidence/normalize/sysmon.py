@@ -14,7 +14,7 @@ def compute_deterministic_event_id(source_id: str, source_locator: str) -> str:
     return f"EVT-{hashlib.sha256(seed).hexdigest()[:16]}"
 
 
-def normalize_sysmon_event(source_file_hash: str, file_path: str, line_number: int, raw_fields: Dict[str, Any]) -> Event:
+def normalize_sysmon_event(source_file_hash: str, file_path: str, line_number: int, raw_fields: Dict[str, Any], raw_bytes: bytes | None = None) -> Event:
     """
     Normalizes raw telemetry log record into an Event contract object.
     Preserves raw fields completely.
@@ -28,8 +28,7 @@ def normalize_sysmon_event(source_file_hash: str, file_path: str, line_number: i
         raw_fields.get("timestamp") or
         ""
     )
-    dt_obj, _ = parse_timestamp_text(original_ts_text)
-    ts = dt_obj if dt_obj else datetime.utcnow()
+    ts, timestamp_status = parse_timestamp_text(original_ts_text)
 
     process_guid, parent_process_guid, pid, host = extract_identity_fields(raw_fields)
 
@@ -37,12 +36,25 @@ def normalize_sysmon_event(source_file_hash: str, file_path: str, line_number: i
         file_hash=source_file_hash,
         file_path=file_path,
         line_number=line_number,
-        raw_hash=hashlib.sha256(str(raw_fields).encode("utf-8")).hexdigest()
+        raw_hash=hashlib.sha256(raw_bytes if raw_bytes is not None else str(raw_fields).encode("utf-8")).hexdigest()
     )
+
+    kinds = {1: EventKind.PROCESS_CREATE, 3: EventKind.NETWORK_CONNECT,
+             5: EventKind.PROCESS_TERMINATE, 7: EventKind.IMAGE_LOAD,
+             11: EventKind.FILE_CREATE, 13: EventKind.REGISTRY_SET,
+             22: EventKind.DNS_QUERY, 23: EventKind.FILE_DELETE}
+    try:
+        kind = kinds.get(int(raw_fields.get("EventID", 0)), EventKind.UNKNOWN)
+    except (ValueError, TypeError):
+        kind = EventKind.UNKNOWN
+    fields = dict(raw_fields)
+    for original, normalized in (("DestinationIp", "dest_ip"), ("DestinationPort", "dest_port"), ("TargetFilename", "target_filename")):
+        if original in raw_fields:
+            fields[normalized] = raw_fields[original]
 
     return Event(
         event_id=event_id,
-        kind=EventKind.PROCESS_CREATE if raw_fields.get("EventID") == 1 else EventKind.UNKNOWN,
+        kind=kind,
         timestamp=ts,
         host=host,
         process_guid=process_guid,
@@ -53,5 +65,9 @@ def normalize_sysmon_event(source_file_hash: str, file_path: str, line_number: i
         parent_image=raw_fields.get("ParentImage"),
         user=raw_fields.get("User"),
         source=source,
-        fields=raw_fields
+        fields=fields,
+        raw_fields=dict(raw_fields),
+        original_timestamp_text=str(original_ts_text),
+        timestamp_status=timestamp_status,
+        parse_status="error" if "_parse_error" in raw_fields else "parsed",
     )

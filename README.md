@@ -1,199 +1,166 @@
 # Sentinel Evidence
 
-> A local-first, evidence-grounded security investigation system for Windows telemetry that strictly enforces "Evidence first, claims second, explanation last."
+A local-first Windows telemetry investigation tool: **evidence first, claims second,
+explanation last**. Import a selected JSONL file, inspect deterministic relationships
+and typed claims, and trace each claim back to its original bytes.
 
-## Team
+## Team and problem
 
-**Team Name:** Sentinel Team (Update this if you have a specific team name)
+Built by Sujan, Pramit, Jana and Sujai. Current integration ownership follows the final
+integration brief: Sujan — intake/normalization/SQLite; Pramit — identity/correlation;
+Jana — scenarios/typed claims; Sujai — API/React/security/local AI/integration.
+The team name and actual event-day contribution history still require team confirmation.
 
-| Member | Contribution   |
-| ------ | -------------- |
-| Sujan  | Evidence Foundation (Intake, Hashing, Normalization, SQLite) |
-| Pramit | Correlation and Claims (Process Identity, Typed Edges, Claim Validation) |
-| Sujai  | AI, Validation, Evaluation (Evidence Packets, Ollama Integration, Testing) |
-| Jana   | API, UI, Security (FastAPI, React Viewer, Evidence Drill-down) |
+Security investigations can overstate telemetry: a connection is not exfiltration,
+a file creation is not persistence, and timestamp proximity is not causation.
+This project was selected to make these boundaries explicit and inspectable.
 
-## Problem Statement
+## Implemented solution
 
-### The Problem
+- SHA-256 source hashing, exact original-byte retention and stable source/line event IDs.
+- Flat Sysmon JSONL normalization, raw values and timestamp uncertainty preserved.
+- Same-host ProcessGuid identity; bounded PID fallback with ambiguity surfaced.
+- Three bounded scenarios: flagged parent/child, flagged process/network, flagged process/file.
+- One explicit encoded-PowerShell detector indicator, not a comprehensive malware detector.
+- Typed support sets, missing prerequisites, conflicting-record preservation and evidence-removal checks.
+- Canonical deterministic report, budgeted evidence packets and optional local Ollama.
+- SQLite case storage, random bearer-token isolation, paginated FastAPI endpoints.
+- React import, timeline, claims, packet inspection and original-source download.
+- Shared headless CLI and fixture replay/evaluation.
 
-In security operations, analyzing Windows telemetry (like EVTX/JSONL logs) often leads to assumptions and hallucinations—both by human analysts and AI tools. Systems frequently infer causality from timestamp proximity or jump to conclusions (e.g., assuming exfiltration simply because a flagged process made an outbound connection) without concrete support sets, leading to false positives and unreliable investigations.
+The differentiator is traceable support and conservative uncertainty, rather than an AI
+narrative. Claims remain authoritative when the model is unavailable.
 
-### Why We Chose This Problem
+## Architecture and contracts
 
-We chose this problem because security tooling must never turn telemetry into a stronger conclusion than the evidence supports. Ensuring that findings are strictly grounded in verifiable, deterministic evidence before applying AI explanations is crucial for trustworthy security investigations.
+JSONL → hashing/normalization → detector → identity/edges → scenarios → typed claims
+→ deterministic report → API/React. A separate optional path passes a complete bounded
+packet to local Ollama and validates its response before displaying it.
 
-## Solution
+One Python package, SQLite, FastAPI and React/TypeScript. Canonical Python domain objects
+are in src/sentinel_evidence/contracts.py; API fields are presentation views.
+See [the supplied architecture specification](docs/architecture-spec.md),
+[integration decisions and limitations](docs/integration.md), and
+[the local threat model](docs/threat-model.md).
 
-Sentinel Evidence is a local-first system that ingests documented JSONL evidence, normalizes it, resolves process identity, correlates bounded activity patterns, and compiles typed claims with exact support sets. It only uses an optional local Ollama model for explanation *after* deterministic validation, presenting the result through a FastAPI + React case viewer.
+The supplied specification describes the target architecture, including research and
+submission work not yet completed. This README describes the code actually present.
 
-### Key Features
+## Setup
 
-- **Evidence-First Architecture:** Normalizes logs into deterministic events before any claim generation.
-- **Strict Entity Resolution:** Uses `(host, ProcessGuid)` identity with bounded PID fallback, leaving ambiguous identities unresolved rather than unsafe merging.
-- **Typed Claim Compiler:** Correlates scenarios (e.g., suspicious parent/child execution, flagged process + file creation) into verifiable claims.
-- **AI Validator:** Uses a local model (Ollama) strictly to explain approved claims, actively blocking hallucinations of new facts, entities, or unsupported ATT&CK assertions.
+Prerequisites: Python 3.10+, Node.js 22.14+ (or a compatible newer release), npm.
+Ollama is optional. Run all commands from the repository root unless noted.
 
-## Innovation and Differentiation
+~~~sh
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[test]'
+python -m uvicorn sentinel_evidence.api.app:app --host 127.0.0.1 --port 8000
+~~~
 
-Unlike typical SIEMs or AI security copilots that dump data into an LLM, Sentinel Evidence enforces a "Freeze Before Coding" contract where deterministic rules map exactly to raw evidence locators. If a single supporting event is removed from a claim, the claim automatically disappears or downgrades to "insufficient_evidence". The system is designed to work correctly with no model and no UI.
+In a second terminal:
 
-## Technical Implementation
+~~~sh
+cd web
+npm ci
+npm run dev -- --host 127.0.0.1
+~~~
 
-### Architecture
+Open http://127.0.0.1:5173. Click **New investigation**, select
+fixtures/tiny-supported.jsonl, and click **Import**. Expand a claim to inspect
+supporting records, explanation status and its evidence packet. The source-download
+button returns the exact original file. Each case holds one source; importing again
+replaces that case's current analysis. Create another case to retain separate evidence.
 
-```mermaid
-flowchart TD
-    A[JSONL evidence] --> B[1. Intake & Hashing]
-    B --> C[2. Normalization]
-    C --> D[3. Detector Adapter]
-    D --> E[4. Entity Resolution]
-    E --> F[5. Correlation / Scenarios]
-    F --> G[6. Typed Claim Compiler]
-    G --> H[7. Deterministic Report]
-    H --> I[8. Evidence Packet]
-    H --> J[API / UI]
-    I --> K[9. Optional Ollama]
-    K --> L[10. Validator]
-    L --> M[Validated Explanation]
-    M --> J
-```
+Case access tokens remain in browser sessionStorage. Keep the browser session open.
+API clients receive case_id and token from POST /api/v1/cases; subsequent
+case requests require an Authorization: Bearer token header. API documentation is at
+http://127.0.0.1:8000/docs. This is a local tool; bind servers to loopback.
 
-### Technology Stack
+### Input profile
 
-| Category        | Technologies                |
-| --------------- | --------------------------- |
-| Frontend        | React, TypeScript           |
-| Backend         | Python, FastAPI             |
-| Database        | SQLite                      |
-| AI / ML         | Ollama (Local LLM)          |
-| Infrastructure  | Local-first                 |
-| APIs / Services | N/A                         |
+UTF-8 JSONL, one complete flat Sysmon record per line. Relevant fields:
+EventID, Computer, UtcTime or TimeCreated, ProcessGuid, ParentProcessGuid,
+ProcessId, Image, CommandLine, DestinationIp, DestinationPort,
+Initiated, TargetFilename, EventRecordID, and Channel.
 
-### How It Works
+Supported event kinds include process creation/termination, network, file creation,
+file deletion, image load, registry set and DNS. Unknown kinds remain evidence.
+Raw fields are preserved. Explicit Z/offset timestamps retain their timezone;
+naive timestamps remain naive; absent/unparseable timestamps stay unresolved.
+No binary EVTX parser is provided.
 
-The system operates in a strict pipeline: raw JSONL is ingested, hashed, and normalized into `Events` stored in SQLite (Sujan). Process identities are resolved and correlated into typed `Edges` and `Claims` (Pramit). The backend exposes case-scoped endpoints using FastAPI, consumed by a React viewer that distinguishes between observed facts, hypotheses, and AI drafts (Jana). Optionally, verified claims are packed into an evidence budget and passed to a local Ollama model to generate an explanation, which is then verified against the original facts before presentation (Sujai).
+Imports are limited to 10 MiB, 1 MiB per line and 10,000 lines.
+Relationships use a 300-second window. Verified joins require ProcessGuid.
+Network claims require explicit outbound Initiated: true and a destination.
+Missing prerequisites produce insufficient evidence or no relationship.
 
-### Technical Decisions
+### Configuration
 
-- **Single Python Package & SQLite MVP:** Avoided microservices, Kafka, graph databases, or vector databases to ensure a tight, deterministic local-first MVP.
-- **Strict Evidence Removal Rule:** If the only supporting record for a claim is removed, the claim is invalidated immediately.
-- **Bounded Fallback:** PID matching is bounded by host, time interval, and context; ambiguous matches are explicitly left unresolved.
+[.env.example](.env.example) lists supported settings. Export them in the backend shell;
+the app does not automatically load .env files.
 
-## Implementation During the Hackathon
+- SENTINEL_DB: defaults to .sentinel/cases.db.
+- OLLAMA_URL: defaults to http://127.0.0.1:11434; loopback HTTP only.
+- OLLAMA_MODEL: empty/absent disables AI. Set to a model already installed locally.
 
-The core deterministic pipeline was implemented alongside the UI and AI integration.
+~~~sh
+export OLLAMA_MODEL='your-installed-model'
+~~~
 
-### Team Contributions
+Ollama must already be running locally. No cloud service or automatic model download
+is used. Requests have a timeout and bounded input/output. The model may return only
+the approved explanation object; changes to prose, citations or status are rejected.
+This is constrained explanation selection, not general semantic verification of free
+prose. Disabled/unavailable/invalid AI returns an explicitly labeled deterministic fallback.
 
-- **Sujan:** Built the intake pipeline, manifest handling, Sysmon normalization, SQLite repository, and deterministic event IDs.
-- **Pramit:** Implemented entity resolution `(host, ProcessGuid)`, the three MVP scenarios, claim compilation, support sets, and contradiction logic.
-- **Sujai:** Developed the evidence packet builder, Ollama integration, structured model output, validation, and evaluation harness.
-- **Jana:** Built the FastAPI endpoints, case isolation, and the React/TypeScript case viewer featuring timelines and evidence drill-down.
+### Headless use and verification
 
-## Working Application
+~~~sh
+python -m sentinel_evidence.cli fixtures/tiny-supported.jsonl
+python -m sentinel_evidence.evaluation --fixtures fixtures
+python -m pytest -q
+cd web
+npm run build
+npm run lint
+~~~
 
-**Live Application:** [Add Live URL or N/A if running locally only]
+The CLI and API use the same deterministic engine. Repeated input produces the same
+events, claims and output hash; run timestamps record actual execution times.
+See [evaluation methodology](docs/evaluation.md). Synthetic fixtures are regression
+tests, not a representative security benchmark.
 
-[Briefly explain how to access the deployment, or state that it is designed to run locally.]
+## Work present and challenges
 
-## Demo Video
+This integration connected the existing foundation and claim modules with the API/UI
+from the repository's API branch, adapted the identity implementation to the active
+contracts, removed production mock dependencies, added packets/local AI validation,
+and introduced integrated/security tests and fixture replay.
 
-**Demo Video:** [Add Video URL]
+The major integration challenges were conflicting branch contracts, invented timestamps,
+missing normalization for network/file records, and partial support removal incorrectly
+leaving claims verified. The implementation preserves compatible interfaces while
+correcting these evidence-integrity defects. Actual Hack Day timing and contribution
+history must be confirmed by the team; they are not inferred from code availability.
 
-[Provide a short demonstration of the working project.]
+## Open source, AI and credits
 
-## Open Source and AI Usage
+- Python and SQLite provide the local engine/storage; SQLite is public domain.
+- FastAPI, Uvicorn, Pydantic, React, TypeScript, Vite and PyYAML are external open-source
+  components; their upstream licenses and installed package notices apply.
+- Pytest and HTTPX support testing. npm records frontend dependencies in its lockfile.
+- Ollama is an optional external local inference runtime. Model weights are external;
+  the selected model's own license applies. No model is trained by this team.
+- AI-assisted integration/code changes were made with OpenAI Codex in this workspace.
+- Fixtures are hand-authored synthetic examples, not real incident captures.
 
-### AI / Models
+## Submission items still requiring team input
 
-- **Ollama (Local Model):** Used strictly to explain deterministically approved claims in simpler language. Validated to prevent hallucinating events, entities, or unsupported assertions.
+Confirm the team name, event-day history, demo video, Devpost link and project license.
+No project license was selected in the existing repository; this integration does not
+grant a license on behalf of the contributors. Do not describe the repository as fully
+licensed until the team supplies an appropriate LICENSE file.
 
-### Open Source Components
-
-- **React & TypeScript:** Frontend UI and Case Viewer.
-- **FastAPI (Python):** Backend API and case-scoped endpoints.
-- **SQLite:** Local storage of normalized events, edges, and claims.
-
-## Setup and Usage
-
-### Prerequisites
-
-- Python 3.10+
-- Node.js (for React frontend)
-- Ollama (installed locally for AI features)
-- `uv` package manager (optional, based on your repo structure)
-
-### Installation
-
-```bash
-git clone https://github.com/sujan28-rgb/hacktoberfest-hack-day-coimbatore-x-init-club-and-idea-club.git
-cd hacktoberfest-hack-day-coimbatore-x-init-club-and-idea-club
-
-# Setup Python Backend
-# [installation-command] e.g., pip install -e .
-
-# Setup Frontend
-# cd web && npm install
-```
-
-### Environment Variables
-
-```env
-# Optional environment variables if needed
-```
-
-### Running the Project
-
-```bash
-# Start Backend
-# uvicorn sentinel_evidence.api.app:app --reload
-
-# Start Frontend
-# cd web && npm start
-```
-
-### Usage
-
-1. Ingest documented JSONL evidence using the CLI or API.
-2. View the deterministically generated claims in the React UI.
-3. Drill down into the timeline to view raw supporting evidence locators.
-4. (Optional) Run the local Ollama explanation to view human-readable summaries of supported inferences.
-
-## Devpost Submission
-
-**Devpost Project:** [Add Devpost Project URL]
-
-## Credits and License
-
-### Credits
-
-- Built by Sujan, Pramit, Sujai, and Jana.
-
-### License
-
-[Add License]
-
-## Submission Checklist
-
-- [x] Project title and description added
-- [x] All team members listed
-- [x] Problem clearly explained
-- [x] Reason for choosing the problem explained
-- [x] Solution and key features documented
-- [x] Innovation and differentiation explained
-- [x] Architecture included
-- [x] Technical implementation documented
-- [x] Work completed during the hackathon documented
-- [x] Team contributions documented
-- [ ] Working application is functional
-- [ ] Live application link added where applicable
-- [ ] Demo video added
-- [x] AI and open-source components documented
-- [ ] Setup and usage instructions tested
-- [ ] Challenges and learnings documented
-- [ ] Devpost submission completed
-- [ ] Devpost link added
-- [ ] Credits added
-- [ ] License added
-- [x] Repository is organized and complete
+Independent Windows captures, broader detectors and unconstrained/citation-only model
+benchmark comparisons remain future evaluation work. No enterprise-scale accuracy,
+performance, or deployment claim is made. The application is intended to run locally.

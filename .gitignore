@@ -5,3 +5,11 @@ __pycache__/
 *.egg-info/
 *.egg
 .pytest_cache/
+.venv/
+.env
+node_modules/
+web/dist/
+.sentinel/
+*.db
+*.db-shm
+*.db-wal

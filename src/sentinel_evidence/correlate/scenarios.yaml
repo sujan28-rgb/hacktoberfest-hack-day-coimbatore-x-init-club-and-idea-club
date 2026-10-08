@@ -1,0 +1,91 @@
+# Sentinel Evidence — Scenario Policies
+#
+# Each scenario definition specifies:
+#   - A unique id
+#   - Human-readable name and description
+#   - Required event kinds and relationships (edge kinds)
+#   - Required findings (optional — only for flagged-process scenarios)
+#   - Minimum identity confidence threshold
+#   - Constraints that must hold for the scenario to match
+#
+# These policies are consumed by the scenario matcher in
+# src/sentinel_evidence/correlate/scenarios.py
+#
+# Evidence constraints (README):
+#   Connection ≠ exfiltration
+#   File creation ≠ persistence
+#   Process creation / command line ≠ successful execution
+#   Temporal proximity ≠ causality
+#   Ambiguous PID ≠ verified identity
+#   Missing evidence ≠ proof of absence
+#   Repeated exports ≠ independent corroboration
+#   Suspicious patterns ≠ confirmed malicious behavior
+
+scenarios:
+
+  - id: suspicious_parent_child
+    name: "Suspicious Parent/Child Execution"
+    description: >
+      A process creates a child process where the parent-child relationship
+      is confirmed via ProcessGuid linkage and the parent or child image
+      matches a known-suspicious pattern. Requires a parent_child edge
+      with identity confidence above the threshold.
+    required_events:
+      - kind: process_create
+        role: parent
+      - kind: process_create
+        role: child
+    required_edges:
+      - kind: parent_child
+    required_findings: []
+    min_identity_confidence: 0.8
+    constraints:
+      - "parent_child edge must link parent and child via ProcessGuid"
+      - "at least one finding must flag the parent or child process"
+      - "ambiguous PID-only identity does not satisfy this scenario"
+
+  - id: flagged_process_network
+    name: "Flagged Process + Outbound Network Connection"
+    description: >
+      A process flagged by a detector finding subsequently makes an
+      outbound network connection. The finding and the network event
+      must share the same (host, ProcessGuid) identity. This scenario
+      establishes that the flagged process made a connection — it does
+      NOT establish exfiltration or data theft.
+    required_events:
+      - kind: process_create
+        role: flagged_process
+      - kind: network_connect
+        role: connection
+    required_edges:
+      - kind: network_connection
+    required_findings:
+      - applies_to: flagged_process
+    min_identity_confidence: 0.8
+    constraints:
+      - "connection event must follow process creation temporally"
+      - "process identity must be resolved via ProcessGuid, not PID alone"
+      - "connection ≠ exfiltration: claim must not assert data theft"
+
+  - id: flagged_process_file_create
+    name: "Flagged Process + File Creation"
+    description: >
+      A process flagged by a detector finding creates a file on disk.
+      The finding and file_create event must share the same
+      (host, ProcessGuid) identity. This scenario establishes that the
+      flagged process created a file — it does NOT establish persistence
+      or payload drop.
+    required_events:
+      - kind: process_create
+        role: flagged_process
+      - kind: file_create
+        role: file_event
+    required_edges:
+      - kind: file_activity
+    required_findings:
+      - applies_to: flagged_process
+    min_identity_confidence: 0.8
+    constraints:
+      - "file_create event must follow process creation temporally"
+      - "process identity must be resolved via ProcessGuid, not PID alone"
+      - "file creation ≠ persistence: claim must not assert persistence"

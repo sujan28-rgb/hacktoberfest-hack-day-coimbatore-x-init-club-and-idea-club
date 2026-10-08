@@ -1,6 +1,6 @@
 """Timestamp parsing without fabricating timezone information."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Tuple, Optional
 
 
@@ -29,6 +29,8 @@ def parse_timestamp_text(ts_text: Optional[str]) -> Tuple[Optional[datetime], st
     for fmt in formats:
         try:
             dt = datetime.strptime(ts_text_str, fmt)
+            if fmt.endswith("Z"):
+                dt = dt.replace(tzinfo=timezone.utc)
             return dt, "parsed"
         except ValueError:
             continue

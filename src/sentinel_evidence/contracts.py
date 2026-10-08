@@ -52,7 +52,7 @@ class Event:
     """A single normalised telemetry event."""
     event_id: str                   # deterministic: SHA-256(source + normalized fields)
     kind: EventKind
-    timestamp: datetime
+    timestamp: Optional[datetime]
     host: str
     process_guid: Optional[str]     # Sysmon ProcessGuid when available
     pid: Optional[int]
@@ -63,6 +63,10 @@ class Event:
     user: Optional[str]
     source: Source
     fields: dict[str, Any] = field(default_factory=dict)  # extra normalised fields
+    raw_fields: dict[str, Any] = field(default_factory=dict)
+    original_timestamp_text: str = ""
+    timestamp_status: str = "unknown"
+    parse_status: str = "parsed"
 
     def identity_key(self) -> tuple[str, Optional[str]]:
         """Canonical identity: (host, ProcessGuid)."""
@@ -195,6 +199,18 @@ class Run:
     findings: list[Finding] = field(default_factory=list)
     edges: list[Edge] = field(default_factory=list)
     claims: list[Claim] = field(default_factory=list)
+    source_hashes: list[str] = field(default_factory=list)
+    parser_version: str = ""
+    detector_version: str = ""
+    rule_version: str = ""
+    policy_version: str = ""
+    model_digest: Optional[str] = None
+    prompt_digest: Optional[str] = None
+    parameters: dict[str, Any] = field(default_factory=dict)
+    limits: dict[str, Any] = field(default_factory=dict)
+    software_revision: str = ""
+    timestamps: dict[str, Any] = field(default_factory=dict)
+    output_hashes: dict[str, str] = field(default_factory=dict)
 
 
 def make_deterministic_id(*parts: str) -> str:

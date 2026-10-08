@@ -17,6 +17,8 @@ class IntakeLimits:
     @classmethod
     def validate_path(cls, file_path: Path) -> Path:
         """Validate path to prevent traversal, symlink exploitation, and check existence."""
+        if ".." in file_path.parts or file_path.is_symlink():
+            raise IntakeLimitError("Traversal and symlink paths are not allowed")
         resolved = file_path.resolve(strict=True)
 
         if not resolved.is_file():

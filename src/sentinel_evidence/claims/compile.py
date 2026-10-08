@@ -204,7 +204,7 @@ def _determine_status(match: ScenarioMatch) -> ClaimStatus:
         violated = match.constraints_violated
         critical_violations = [
             v for v in violated
-            if "ProcessGuid" in v or "PID-only" in v or "must flag" in v or "finding" in v.lower()
+            if "ProcessGuid" in v or "PID-only" in v or "must" in v or "finding" in v.lower()
         ]
         if critical_violations:
             return ClaimStatus.INSUFFICIENT_EVIDENCE

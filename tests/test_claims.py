@@ -273,7 +273,7 @@ class TestEvidenceRemoval:
     def test_partial_evidence_removal(
         self, parent_event, child_event, parent_child_edge, parent_finding
     ):
-        """Removing some (but not all) evidence keeps the claim but may reduce support."""
+        """A remaining parent cannot establish a relationship after its child is removed."""
         matches = run_scenarios(
             events=[parent_event, child_event],
             edges=[parent_child_edge],
@@ -288,8 +288,8 @@ class TestEvidenceRemoval:
             available_evidence_ids={parent_event.event_id},
         )
         # Some support remains
-        assert updated.support_sets  # not empty
-        assert updated.status != ClaimStatus.INSUFFICIENT_EVIDENCE
+        assert not updated.support_sets
+        assert updated.status == ClaimStatus.INSUFFICIENT_EVIDENCE
 
     def test_all_evidence_present_no_change(
         self, parent_event, child_event, parent_child_edge, parent_finding

@@ -48,7 +48,7 @@ class EvidenceRepository:
             (
                 e.event_id,
                 e.kind.value if isinstance(e.kind, EventKind) else str(e.kind),
-                e.timestamp.isoformat(),
+                e.timestamp.isoformat() if e.timestamp else "",
                 e.host,
                 e.process_guid,
                 e.pid,

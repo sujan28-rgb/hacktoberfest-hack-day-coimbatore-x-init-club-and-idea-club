@@ -1,0 +1,4 @@
+{"EventID":1,"Computer":"LAB","UtcTime":"2026-10-08T10:00:00Z","ProcessGuid":"parent","ProcessId":100,"Image":"C:\\Windows\\explorer.exe"}
+{"EventID":1,"Computer":"LAB","UtcTime":"2026-10-08T10:00:01Z","ProcessGuid":"child","ParentProcessGuid":"parent","ProcessId":200,"Image":"C:\\Windows\\powershell.exe","CommandLine":"powershell.exe -enc ZWNobyBoaQ=="}
+{"EventID":3,"Computer":"LAB","UtcTime":"2026-10-08T10:00:02Z","ProcessGuid":"child","ProcessId":200,"Image":"C:\\Windows\\powershell.exe","DestinationIp":"192.0.2.10","DestinationPort":443,"Initiated":true}
+{"EventID":11,"Computer":"LAB","UtcTime":"2026-10-08T10:00:03Z","ProcessGuid":"child","ProcessId":200,"Image":"C:\\Windows\\powershell.exe","TargetFilename":"C:\\Temp\\example.txt"}
